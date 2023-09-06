@@ -1,0 +1,37 @@
+data_params:
+  data_name: TPS_eurasia_train3899
+  data_path: /home/daqu/Projects/data/aDNA/Eurasian/TPS_3899inds/
+  num_workers: 4
+  train_batch_size: 48
+  val_batch_size: 48
+exp_params:
+  LR: 0.0001
+  manual_seed: 1265
+  scheduler_gamma: 0.99
+  weight_decay: 1.0e-05
+logging_params:
+  save_dir: outputs/
+model_params:
+  attn_dropout: 0.05
+  aux: false
+  beta: 15.0
+  conv_layer: 6
+  d_token: 256
+  decoder: DecoderTransformer
+  dropout_rate: 0.04
+  encoder: EncoderTransformer
+  factor_token: 4
+  heads: 4
+  hidden_dim: 72
+  in_channels: 1
+  in_dim: 152510
+  latent_dim: 10
+  loss: BCE
+  mha_layer: 4
+  name: VAE
+  pos_dropout: 0.01
+  sparsify: 0.1
+trainer_params:
+  gpus:
+  - 0
+  max_epochs: 200
