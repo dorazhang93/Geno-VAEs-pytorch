@@ -130,6 +130,6 @@ class idVAE(BaseVAE):
         kl_post_prior = kl_criterion(*post_dist, *prior_dist)
         kld_weight = self.latent_dim / self.in_dim
         loss = recons_loss + self.beta * kld_weight * kl_post_prior
-        loss += aux_loss(recon_u, aux_label)
-        loss += kl_criterion(*prior_dist, torch.zeros_like(prior_dist[0]), torch.ones_like(prior_dist[1]))
+        loss += aux_loss(recon_u, aux_label)*0.1
+        loss += kl_criterion(*prior_dist, torch.zeros_like(prior_dist[0]), torch.ones_like(prior_dist[1]))*0.1
         return {'loss': loss, 'Reconstruction_loss': recons_loss.detach(), 'Reg_loss':kl_post_prior.detach()}

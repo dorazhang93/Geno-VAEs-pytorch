@@ -4,12 +4,33 @@ from sklearn.model_selection import train_test_split
 from analyzer.plots import plot_genotype_hist
 
 rng = np.random.RandomState(0)
-
+FULL_FILEBASE = "/home/daqu/Projects/data/aDNA/Eurasian_extension/TPS_global_full"
+TEST_FILEBASE = "/home/daqu/Projects/data/aDNA/Eurasian/TPS_test1264/TPS_eurasia_test1264"
 def g(file):
     with open(file,"r") as f:
         for line in f.readlines():
             for item in list(map(int, line.strip("\n"))):
                 yield item
+
+def compare_snp(snp_profile1,snp_profile2):
+    assert len(snp_profile1)==len(snp_profile2)
+    flipped_loc=[]
+    unkown_loc=[]
+    for i in range(len(snp_profile1)):
+        snp1=snp_profile1[i]
+        snp2=snp_profile2[i]
+        if snp2[0] == snp1[0]:
+            if snp2[4]==snp1[4] and snp2[5]==snp1[5]:
+                continue
+            elif snp2[5]==snp1[4] and snp2[4]==snp1[5]:
+                flipped_loc.append(i)
+            else:
+                print(snp1)
+                print(snp2)
+                unkown_loc.append(i)
+        else:
+            raise ("Mismatched SNP orders")
+    return flipped_loc,unkown_loc
 
 class Preprocesser:
     def __init__(self,
@@ -19,7 +40,8 @@ class Preprocesser:
                  train_val_split: float = 0.2,
                  missing_val_ori: float = 9.0,
                  missing_val_norm: float = -1.0,
-                 split_policy: str = "random"):
+                 split_policy: str = "random",
+                 sanity_check = False):
         """
         @param filebase: path+ filename without suffix eg. "/home/data/TPS_full/new_TPS"
         @param normalization: wheter to normalize input
@@ -35,10 +57,45 @@ class Preprocesser:
         self.missing_val_ori = missing_val_ori
         self.missing_val_norm = missing_val_norm
         self.split_policy = split_policy
+        if sanity_check:
+            print("sanity check ...")
+            if self._sanity_check():
+                print("Passed sanity check")
+            else:
+                raise ("Failed sanity check")
         self.inds, self.targets = self._load_inds()
         self.genotypes = self._load_genotype()
         self.missing_mask = (self.genotypes!=self.missing_val_ori).astype(int).T # 0 means missing
         print(f"Overall missing rate is {1-self.missing_mask.sum()/self.missing_mask.size}")
+
+    def _sanity_check(self):
+        # load full set
+        full_inds = np.genfromtxt(FULL_FILEBASE+".ind", usecols=(0),dtype=str)
+        print("Reading individual profiles from " + FULL_FILEBASE + ".ind")
+        full_snps = np.genfromtxt(FULL_FILEBASE+".snp",dtype=str)
+        print("Reading snps profiles from" + FULL_FILEBASE + ".snp")
+        full_geno = np.fromiter(g(FULL_FILEBASE+".eigenstratgeno"),dtype=float).reshape(-1,len(full_inds))
+        # load test set
+        test_inds = np.genfromtxt(TEST_FILEBASE+".ind", usecols=(0),dtype=str)
+        print("Reading individual profiles from " + TEST_FILEBASE + ".ind")
+        test_snps = np.genfromtxt(TEST_FILEBASE+".snp",dtype=str)
+        print("Reading snps profiles from" + TEST_FILEBASE + ".snp")
+        test_geno = np.fromiter(g(TEST_FILEBASE+".eigenstratgeno"),dtype=float).reshape(-1,len(test_inds))
+        # compare snp file
+        snp_where_flipped, unknown = compare_snp(full_snps,test_snps)
+        test_of_full = (full_geno.T)[np.array([np.where(full_inds==x)[0][0] for x in test_inds])]
+        test_geno = test_geno.T
+        # test_geno = np.load("test.npy")
+        # test_of_full = np.load("test_of_full.npy")
+        np.save("test.npy",test_geno)
+        np.save("test_of_full.npy",test_of_full)
+        print(test_of_full.shape, test_geno.shape)
+        for idx in snp_where_flipped:
+            test_of_full[:,idx]=2-test_of_full[:,idx]
+        for idx in unknown:
+            test_of_full[:,idx]=test_geno[:,idx]
+        test_of_full[test_of_full == -7] = 9
+        return np.array_equal(test_of_full,test_geno)
 
     def _load_inds(self):
         """
@@ -56,12 +113,13 @@ class Preprocesser:
         @return: raw genotype data in 0,1,2,9(missing)
         @rtype: np.array in shape of (num_SNPs, num_inds)
         """
-        num_inds = len(self.inds)
-        genotypes = np.fromiter(g(self.filebase + ".eigenstratgeno"), dtype=float).reshape(-1, num_inds)
-        print("Reading genotypes from " + self.filebase + ".eigenstratgeno")
+        # load full set
+        full_inds = np.genfromtxt(FULL_FILEBASE+".ind", usecols=(0),dtype=str)
+        print("Reading individual profiles from " + FULL_FILEBASE + ".ind")
+        full_geno = np.fromiter(g(FULL_FILEBASE+".eigenstratgeno"),dtype=float).reshape(-1,len(full_inds))
+        genotypes = (full_geno.T)[np.array([np.where(full_inds==x)[0][0] for x in self.inds[:,0]])]
         print("genotypes's shape", genotypes.shape)
-        return genotypes
-
+        return genotypes.T
     def _normalize(self):
         """
         Normalize genotypes into interval [0,1] by translating 0,1,2 -> 0.0, 0.5, 1.0, missing value (default 9) -> -1
@@ -166,11 +224,12 @@ class Preprocesser:
 
 
 if __name__ == "__main__":
-    params= {"filebase":"/home/daqu/Projects/data/aDNA/Eurasian/TPS_test1264/TPS_eurasia_test1264",
+    params= {"filebase":"/home/daqu/Projects/data/aDNA/Eurasian_extension/TPS_global_mind01_dsM_ddup/TPS_global_mind01_dsM_ddup",
              "normalization": True,
              "impute_missing": "MF",
              "train_val_split": 0.2,
              "missing_val_ori": 9.0,
-             "split_policy": "stratified"}
+             "split_policy": "stratified",
+             "sanity_check": False}
     processer = Preprocesser(**params)
-    processer.process(split_val=False)
+    processer.process(split_val=True)

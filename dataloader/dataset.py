@@ -1,3 +1,4 @@
+import json, os
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -31,8 +32,31 @@ class DNA(Dataset):
             self.mf = self._get_most_frequent()
         self.pops = None
         if self.aux:
-            self.pops = np.load(self.data_dir + f"_continents_oh_{split}.npy")
+            if os.path.exists(self.data_dir + f"_continent_oh_{split}.npy"):
+                self.pops = np.load(self.data_dir + f"_continent_oh_{split}.npy")
+            else:
+                self.pops = self._encode_pop()
+                np.save(self.data_dir + f"_continent_oh_{split}.npy", self.pops)
             print("pop labels shape", self.pops.shape)
+
+    def _encode_pop(self):
+        with open("/home/daqu/Projects/data/aDNA/TPS_global_country_continent.json","r") as f:
+            country_continent_map = json.loads(f.read())
+        continents = [country_continent_map[x] if x!="Rare_pop" else "Unknown" for x in self.inds[:,1]]
+        num_contients = len(list(set(continents)-set(["Unknown"])))
+        continent_emb = {"Europe":0, "Central_and_Western_Asia":1, "Eastern_Asia_and_Oceania":2,
+                        "Africa":3, "America":4,"Unknown":-1}
+        def one_hot(x):
+            e = np.zeros(num_contients)
+            # rare population
+            if x == -1:
+                return e
+            else:
+                assert x<num_contients
+                e[x] =1
+            return e
+
+        return np.array([one_hot(continent_emb[x]) for x in continents])
 
     def _get_most_frequent(self,):
         print("get most frequent allele for each SNP")

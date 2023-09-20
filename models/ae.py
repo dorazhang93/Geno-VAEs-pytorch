@@ -107,5 +107,5 @@ class AE(BaseVAE):
             aux_label = args[4]
             aux_logit = args[5]
             a_loss = aux_loss(aux_logit,aux_label)
-            loss += a_loss * 0.0001
+            loss += a_loss * 0.001
         return {'loss': loss, 'Reconstruction_loss': recons_loss.detach(), 'Reg_loss':reg_loss.detach()}
