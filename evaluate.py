@@ -28,10 +28,14 @@ def norm(input):
 # _,_,idx_train,idx_test = train_test_split(idx,idx,test_size=0.15,random_state=rng)
 
 # use Sara's split
+# ENCODE="EnEurasia"
+# ENCODE="testEn1k"
+# ENCODE="EnGlobal"
+ENCODE="stageIIEn6kEurasia"
 X_train = np.load(out_dir / "train_latent_features.npy")
-Y_train = np.load("/home/daqu/Projects/data/aDNA/Eurasian/TPS_6535inds/TPS_eurasia_train6535_MF_Y_all.npy")
+Y_train = np.load("/home/avesta/daqu/Projects/genome/data/aDNA/final/Eurasian/diff_encoding/TPS_6535inds/TPS_eurasia_train6535_MF_Y_all.npy")
 X_test = np.load(out_dir / "test_latent_features.npy")
-Y_test = np.load("/home/daqu/Projects/data/aDNA/Eurasian/TPS_test1264/TPS_eurasia_test1264_MF_Y_all.npy")
+Y_test = np.load("/home/avesta/daqu/Projects/genome/data/aDNA/final/Eurasian/same_popEurasian_encoding/TPS_test1264/TPS_eurasia_test1264_MF_Y_all.npy")
 Y=np.append(Y_train,Y_test,axis=0)
 Y_norm, Y_scale, Y_mean = norm(Y)
 Y_date =Y_norm[:,0]
@@ -57,14 +61,17 @@ def extra_eval_time_regression():
     model = RandomForestRegressor(random_state=rng)
     model.fit(X_train,Y_date[:idx_train])
     predict_test = model.predict(X_test)*Y_scale[0]+Y_mean[0]
+    predict_train = model.predict(X_train)*Y_scale[0]+Y_mean[0]
 
-    ae = np.abs(Y_test[:,0]-predict_test)
-    result = {"Date regression":{"Mean Absolute Error":{"average":ae.mean(), "std": ae.std()}}}
+    ae_test = np.abs(Y_test[:,0]-predict_test)
+    ae_train = np.abs(Y_train[:,0]-predict_train)
+    result = {"Date regression":{"Mean Absolute Error":{"test":{"average":ae_test.mean(), "std": ae_test.std()},
+                                                        "train":{"average":ae_train.mean(), "std": ae_train.std()},}}}
     print(result)
-    with open(out_dir / "Date_regression.json", "w") as f:
+    with open(out_dir / f"Date_regression_{ENCODE}.json", "w") as f:
         f.write(json.dumps(result))
 
-    np.save(out_dir / "test_date_prediction.npy", predict_test)
+    np.save(out_dir / f"test_date_prediction_{ENCODE}.npy", predict_test)
     return
 
 def extra_eval_location_regression():
@@ -72,16 +79,20 @@ def extra_eval_location_regression():
     model.fit(X_train,Y_location[:idx_train,:])
 
     predict_test = model.predict(X_test)
+    predict_train = model.predict(X_train)
 
-    ae = np.sqrt((np.abs(Y_location[idx_train:,:]-predict_test)**2).sum(axis=1))
-    r2 = r2_score(Y_location[idx_train:,:],predict_test)
-    result = {"Location regression":{"Mean Absolute Error":{"average":ae.mean(), "std": ae.std()},
-                                 "r2 score":{"average":r2}}}
+    ae_test = np.sqrt((np.abs(Y_location[idx_train:,:]-predict_test)**2).sum(axis=1))
+    r2_test = r2_score(Y_location[idx_train:,:],predict_test)
+    ae_train = np.sqrt((np.abs(Y_location[:idx_train, :] - predict_train) ** 2).sum(axis=1))
+    r2_train = r2_score(Y_location[:idx_train, :], predict_train)
+    result = {"Location regression":{"Mean Absolute Error":{"test":{"average":ae_test.mean(), "std": ae_test.std()},
+                                                            "train":{"average":ae_train.mean(), "std": ae_train.std()}},
+                                 "r2 score":{"test":{"average":r2_test},"train":{"average":r2_train}}}}
     print(result)
-    with open(out_dir / "Location_regression.json", "w") as f:
+    with open(out_dir / f"Location_regression_{ENCODE}.json", "w") as f:
         f.write(json.dumps(result))
 
-    np.save(out_dir / "test_location_prediction.npy", predict_test*Y_scale[2:]+Y_mean[2:])
+    np.save(out_dir / f"test_location_prediction_{ENCODE}.npy", predict_test*Y_scale[2:]+Y_mean[2:])
     return
 
 # def cross_val_time_regression():
